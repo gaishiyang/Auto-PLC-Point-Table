@@ -422,13 +422,20 @@ def _process_device(rows, device, points, ka_counter, add_spacing=True,
     
     seq = 1  # 每个设备从序号1开始
     
-    # I点位
+    # I点位（公共端按优先级插入）
+    common_inserted = False
     for key in _sorted_keys(i_pts, priority_dict):
+        if not common_inserted and has_i:
+            common_key = f"{device}公共"
+            if _get_sort_key(common_key, priority_dict) <= _get_sort_key(key, priority_dict):
+                rows.append((seq, common_key, power_pos, ""))
+                seq += 1
+                common_inserted = True
         rows.append((seq, key, i_pts[key], None))
         seq += 1
     
-    # 公共端（只有有I点的才需要24V+）
-    if has_i:
+    # 公共端还没插入的话（优先级比所有点都低），放最后
+    if has_i and not common_inserted:
         rows.append((seq, f"{device}公共", power_pos, ""))
         seq += 1
     
