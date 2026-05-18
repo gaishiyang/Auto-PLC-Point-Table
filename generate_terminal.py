@@ -185,41 +185,42 @@ DEFAULT_PRIORITY = [
 
 
 def load_priority_table(file_path=None):
-    """加载优先级表，优先从JSON文件加载，其次使用Excel文件，最后使用默认"""
+    """加载优先级表
+    - 传入了文件路径: 直接从Excel加载（忽略已有JSON），保存到JSON以便后续使用
+    - 没传文件路径: 尝试从JSON加载，没有则使用默认
+    """
     global _custom_suffixes
-    
-    # 1. 先尝试从JSON文件加载（持久化存储）
-    json_priority = load_priority_json()
-    if json_priority:
-        update_custom_suffixes(json_priority)  # 更新自定义后缀
-        return json_priority
-    
-    # 2. 如果没有JSON文件，尝试从Excel文件加载
+
+    # 1. 如果传入了文件路径，直接从Excel加载
     if file_path is not None:
         try:
             from openpyxl import load_workbook
             wb = load_workbook(file_path)
             ws = wb.active
-            
+
             priority_dict = {}
             for row in ws.iter_rows(min_row=2, values_only=True):
                 keyword, order = row[0], row[1]
                 if keyword and order is not None:
                     try:
-                        # 处理浮点数(如3.0)和字符串(如"3")的情况
                         priority_dict[str(keyword).strip()] = int(float(order))
                     except:
                         pass
-            
+
             if priority_dict:
-                # 保存到JSON文件以便下次使用
                 save_priority_json(priority_dict)
-                update_custom_suffixes(priority_dict)  # 更新自定义后缀
+                update_custom_suffixes(priority_dict)
                 print(f"成功加载 {len(priority_dict)} 个优先级词条")
                 return priority_dict
         except Exception as e:
             print(f"加载优先级表失败: {e}")
-    
+
+    # 2. 没传文件路径时，从JSON加载（首次加载/后续生成时使用）
+    json_priority = load_priority_json()
+    if json_priority:
+        update_custom_suffixes(json_priority)
+        return json_priority
+
     # 3. 返回默认优先级
     return {name: order for name, order in DEFAULT_PRIORITY}
 
