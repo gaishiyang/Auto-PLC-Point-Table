@@ -313,7 +313,8 @@ def _parse_ka_ranges(range_str):
 
 def generate_terminal_rows_with_spacing(devices, add_spacing=True, priority_dict=None,
                                         plc_type="200SMART", power_pos="24V+", power_neg="24V-",
-                                        iw_prefix="", qw_prefix="", ka_start=1, ka_power_ranges=""):
+                                        iw_prefix="", qw_prefix="", ka_start=1, ka_power_ranges="",
+                                        iw_power_ranges=""):
     """生成端子表行
     add_spacing: 是否在设备之间添加空行
     priority_dict: 优先级字典 {关键词: 优先级}，越小越靠前
@@ -330,6 +331,7 @@ def generate_terminal_rows_with_spacing(devices, add_spacing=True, priority_dict
     # 将输入的相对编号转换为绝对KA编号
     if ka_power_set and ka_start != 1:
         ka_power_set = {k + ka_start - 1 for k in ka_power_set}
+    iw_power_set = _parse_ka_ranges(iw_power_ranges)
     
     # 使用传入的优先级表，默认使用内置的
     if priority_dict is None:
@@ -383,23 +385,23 @@ def generate_terminal_rows_with_spacing(devices, add_spacing=True, priority_dict
     for item in has_i_devices:
         device = item[1]
         points = item[2]
-        _process_device(rows, device, points, ka_counter, add_spacing, plc_type, power_pos, power_neg, priority_dict, iw_prefix, qw_prefix, ka_power_set=ka_power_set)
+        _process_device(rows, device, points, ka_counter, add_spacing, plc_type, power_pos, power_neg, priority_dict, iw_prefix, qw_prefix, ka_power_set=ka_power_set, iw_power_set=iw_power_set)
 
     for device, points in q_only_devices:
-        _process_device(rows, device, points, ka_counter, add_spacing, plc_type, power_pos, power_neg, priority_dict, iw_prefix, qw_prefix, ka_power_set=ka_power_set)
+        _process_device(rows, device, points, ka_counter, add_spacing, plc_type, power_pos, power_neg, priority_dict, iw_prefix, qw_prefix, ka_power_set=ka_power_set, iw_power_set=iw_power_set)
 
     for device, points in iw_only_devices:
-        _process_device(rows, device, points, ka_counter, add_spacing, plc_type, power_pos, power_neg, priority_dict, iw_prefix, qw_prefix, ka_power_set=ka_power_set)
+        _process_device(rows, device, points, ka_counter, add_spacing, plc_type, power_pos, power_neg, priority_dict, iw_prefix, qw_prefix, ka_power_set=ka_power_set, iw_power_set=iw_power_set)
 
     for device, points in qw_only_devices:
-        _process_device(rows, device, points, ka_counter, add_spacing, plc_type, power_pos, power_neg, priority_dict, iw_prefix, qw_prefix, ka_power_set=ka_power_set)
+        _process_device(rows, device, points, ka_counter, add_spacing, plc_type, power_pos, power_neg, priority_dict, iw_prefix, qw_prefix, ka_power_set=ka_power_set, iw_power_set=iw_power_set)
 
     return rows
 
 
 def _process_device(rows, device, points, ka_counter, add_spacing=True,
                     plc_type="200SMART", power_pos="24V+", power_neg="24V-", priority_dict=None,
-                    iw_prefix="", qw_prefix="", ka_power_set=None):
+                    iw_prefix="", qw_prefix="", ka_power_set=None, iw_power_set=None):
     """处理单个设备，生成端子表行，每个设备序号从1开始
     plc_type: "1500" 或 "200SMART"
     power_pos: 24V+标识
@@ -449,34 +451,47 @@ def _process_device(rows, device, points, ka_counter, add_spacing=True,
             seq += 1
     
     # IW点位 - 模拟量输入（根据PLC类型不同处理）
+    has_iw_row = False
     if plc_type == "1500":
-        for key in _sorted_keys_with_polarity(iw_pts, priority_dict, plc_type):
-            # 1500模式：地址直接显示，24V单独一行
+        for iw_idx, key in enumerate(_sorted_keys_with_polarity(iw_pts, priority_dict, plc_type), 1):
+            # 1500模式：地址直接显示
             rows.append((seq, key, f"{iw_prefix}{iw_pts[key]}", None))
             seq += 1
-            rows.append((seq, power_pos, power_pos, ""))
-            seq += 1
-            rows.append((seq, power_neg, power_neg, ""))
-            seq += 1
+            if iw_power_set and iw_idx in iw_power_set:
+                rows.append((seq, "二线制串电+", "24V+", ""))
+                seq += 1
+                rows.append((seq, "二线制串电-", "24V-", ""))
+                seq += 1
+            has_iw_row = True
     else:
         # 200SMART模式：每个IW点拆分为+和-两行，地址追加极性后缀
-        for key in _sorted_keys_with_polarity(iw_pts, priority_dict, plc_type):
+        for iw_idx, key in enumerate(_sorted_keys_with_polarity(iw_pts, priority_dict, plc_type), 1):
             addr = iw_pts[key]
             rows.append((seq, f"{key}+", f"{iw_prefix}{addr}+", ""))
             seq += 1
             rows.append((seq, f"{key}-", f"{iw_prefix}{addr}-", ""))
             seq += 1
-            rows.append((seq, power_pos, power_pos, ""))
-            seq += 1
-            rows.append((seq, power_neg, power_neg, ""))
-            seq += 1
+            if iw_power_set and iw_idx in iw_power_set:
+                rows.append((seq, "二线制串电+", "24V+", ""))
+                seq += 1
+                rows.append((seq, "二线制串电-", "24V-", ""))
+                seq += 1
+            has_iw_row = True
+    if has_iw_row:
+        rows.append((seq, "PE端子", "PE", ""))
+        seq += 1
     
     # QW点位 - 模拟量输出（分+-）
+    has_qw_row = False
     for key in _sorted_keys_with_polarity(qw_pts, priority_dict, plc_type):
         qw_addr = qw_pts[key]
         rows.append((seq, f"{key}+", f"{qw_prefix}{qw_addr}+", None))
         seq += 1
         rows.append((seq, f"{key}-", f"{qw_prefix}{qw_addr}-", None))
+        seq += 1
+        has_qw_row = True
+    if has_qw_row:
+        rows.append((seq, "PE端子", "PE", ""))
         seq += 1
     
     if add_spacing:
@@ -510,7 +525,8 @@ def write_sheet(ws, rows):
 
 
 def generate_terminal_excel(plc_file, output_file, plc_type="200SMART", power_pos="24V+", power_neg="24V-",
-                            iw_prefix="", qw_prefix="", ka_start=1, ka_power_ranges=""):
+                            iw_prefix="", qw_prefix="", ka_start=1, ka_power_ranges="",
+                            iw_power_ranges=""):
     """生成端子表 - 生成两个工作表：有空行的和无空行的
     plc_file: PLC点位表Excel文件路径
     output_file: 输出端子表Excel文件路径
@@ -544,11 +560,11 @@ def generate_terminal_excel(plc_file, output_file, plc_type="200SMART", power_po
     rows_with_spacing = generate_terminal_rows_with_spacing(devices, add_spacing=True, priority_dict=priority_dict,
                                                           plc_type=plc_type, power_pos=power_pos, power_neg=power_neg,
                                                           iw_prefix=iw_prefix, qw_prefix=qw_prefix, ka_start=ka_start,
-                                                          ka_power_ranges=ka_power_ranges)
+                                                          ka_power_ranges=ka_power_ranges, iw_power_ranges=iw_power_ranges)
     rows_no_spacing = generate_terminal_rows_with_spacing(devices, add_spacing=False, priority_dict=priority_dict,
                                                           plc_type=plc_type, power_pos=power_pos, power_neg=power_neg,
                                                           iw_prefix=iw_prefix, qw_prefix=qw_prefix, ka_start=ka_start,
-                                                          ka_power_ranges=ka_power_ranges)
+                                                          ka_power_ranges=ka_power_ranges, iw_power_ranges=iw_power_ranges)
     
     wb = Workbook()
     

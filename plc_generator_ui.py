@@ -626,6 +626,13 @@ class PLCGeneratorApp:
         ttk.Entry(r_prefix, textvariable=self.ka_power_ranges, width=12).pack(side=tk.LEFT, padx=4)
         ttk.Label(r_prefix, text="(如 1~3,5~7)", foreground=self.c['p2']).pack(side=tk.LEFT, padx=4)
 
+        r_iw_power = ttk.Frame(gf2)
+        r_iw_power.pack(fill=tk.X, pady=(6, 0))
+        ttk.Label(r_iw_power, text="IW串电范围:").pack(side=tk.LEFT)
+        self.iw_power_ranges = tk.StringVar(value="")
+        ttk.Entry(r_iw_power, textvariable=self.iw_power_ranges, width=12).pack(side=tk.LEFT, padx=4)
+        ttk.Label(r_iw_power, text="(如 1~3,5~7，IW通道序号)", foreground=self.c['p2']).pack(side=tk.LEFT, padx=4)
+
         # 操作按钮
         btn_row = ttk.Frame(f)
         btn_row.pack(fill=tk.X, pady=(0, 10))
@@ -701,13 +708,15 @@ class PLCGeneratorApp:
         except:
             ka_start = 1
         ka_power_ranges = self.ka_power_ranges.get() or ""
+        iw_power_ranges = self.iw_power_ranges.get() or ""
 
         try:
             self.status_var.set("正在生成...")
             generate_terminal_excel(input_file, output_file, plc_type=plc_type,
                                     power_pos=power_pos, power_neg=power_neg,
                                     iw_prefix=iw_prefix, qw_prefix=qw_prefix,
-                                    ka_start=ka_start, ka_power_ranges=ka_power_ranges)
+                                    ka_start=ka_start, ka_power_ranges=ka_power_ranges,
+                                    iw_power_ranges=iw_power_ranges)
             self.status_var.set("生成完成!")
             has_custom = load_priority_json() is not None
             priority_info = "\n优先级: 自定义" if has_custom else "\n优先级: 默认"
